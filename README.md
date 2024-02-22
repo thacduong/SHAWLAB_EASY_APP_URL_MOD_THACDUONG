@@ -1,0 +1,1 @@
+This app is a modified version of DRPPM_EASY_URL app of Shaw's lab moffitt. In this app, users can modify the URL by adding the gseid to download amd upload automatically both expression and meta data and used them to generate the EASY app.  
