@@ -273,6 +273,28 @@ About_tab <- tabPanel("Intro/Methodology",
                       )
 )
 
+## Data Preview tab ------------------------------------------------------------
+Data_preview_tab <- tabPanel("Data Preview",
+                             shiny::sidebarLayout(
+                               ### Sidebar ------------------------------
+                               shiny::sidebarPanel(
+                                 h3("Matrix Parameters"),
+                                 shiny::uiOutput("rendtext3"),
+                                 h3("Meta Data"),
+                                 shiny::uiOutput("rendtext4"),
+                                 downloadButton("download_expr", "Download Expression Matrix"),
+                                 downloadButton("download_meta", "Download Meta Data"),
+                               ),
+                               ### Main ---------------------------------
+                               shiny::mainPanel(
+                                 shiny::uiOutput("rendMatrixHeader"),
+                                 DT::dataTableOutput("expr_matrix_react_output_input"),
+                                 shiny::uiOutput("rendMetaHeader"),
+                                 DT::dataTableOutput("meta_file")
+                               )
+                             )
+)
+
 ## Data Exploration Tab -------------------------------------------------------------------
 Data_Exploration_tab <- tabPanel("Data Exploration",
                                  fluidPage(
@@ -1215,6 +1237,7 @@ if (Password_Protected) {
                    id = "tabs",
                    collapsible = TRUE,
                    About_tab,
+                   Data_preview_tab,
                    Data_Exploration_tab,
                    DGE_tab,
                    GSEA_tab)
@@ -1281,6 +1304,7 @@ server <- function(input, output, session) {
         removeTab("tabs", "login")
         # add home tab
         appendTab("tabs", About_tab, select = FALSE)
+        appendTab("tabs", Data_preview_tab, select = FALSE)
         appendTab("tabs", Data_Exploration_tab, select = TRUE)
         appendTab("tabs", DGE_tab, select = FALSE)
         appendTab("tabs", GSEA_tab, select = FALSE)
@@ -1606,7 +1630,10 @@ server <- function(input, output, session) {
           }
           
           final_extr_meta <- tidyr::pivot_wider(new_df, names_from = title, values_from = value)
-          meta_merged <- dplyr::full_join(meta, final_extr_meta, by = "geo_accession")
+          print(head(final_extr_meta))
+          final_extr_meta <- as.data.frame(final_extr_meta)
+          meta_merged <- dplyr::full_join(final_extr_meta, meta, by = "geo_accession")
+          view(head(meta_merged))
           meta <- meta_merged
           
           meta[,1] <- gsub("[_.-]", "_", meta[,1])
@@ -1651,7 +1678,124 @@ server <- function(input, output, session) {
                                choices = sampsames,selected = sampsames, server = T)
         }
         
+        #### Matrix Processing -------------------------------------------------------
+        # developing reactive variable for the input expression matrix to be used downstream
+        
+        output$rendMatrixHeader <- renderUI({
+          req(expr_raw())
+          h3("Expr Matrix Preview")
+        })
+        output$expr_matrix_react_output_input <- DT::renderDataTable({
+          req(expr_raw())
+          DT::datatable(expr_raw(),
+                        options = list(lengthMenu = c(5,10, 20, 100, 1000),
+                                       pageLength = 10,
+                                       scrollX = T),
+                        rownames = T)
+        })
+        
+        output$rendMetaHeader <- renderUI({
+          # req(expr_matrix_react())
+          req(meta_raw())
+          h3("Meta Preview")
+        })
+        output$meta_file <- DT::renderDataTable({
+          # req(expr_matrix_react())
+          DT::datatable(meta_raw(),
+                        options = list(lengthMenu = c(5,10, 20, 100, 1000),
+                                       pageLength = 10,
+                                       scrollX = T),
+                        rownames = F)
+          
+        })
+        
+        output$rendtext3 <- renderUI({
+          p(paste0("Expression Matrix Path: ", expr_file_react()))
+        })
+        
+        output$rendtext4 <- renderUI({
+          p(paste0("Expression Matrix Path: ", meta_file_react()))
+        })
+        
+        # Download handler for the button
+        output$download_expr <- downloadHandler(
+          filename = function() {
+            paste("expr_matrix_", expr_file_react(), "_", Sys.Date(), ".tsv", sep = "")
+          },
+          content = function(file) {
+            gene_name = rownames(expr_raw())
+            write_tsv(cbind(gene_name, expr_raw()), file, col_names = T)
+          }
+        )
+        
+        output$download_meta <- downloadHandler(
+          filename = function() {
+            paste("meta_data_", meta_file_react(), "_", Sys.Date(), ".tsv", sep = "")
+          },
+          content = function(file) {
+            write_tsv(meta_raw(), file, col_names = T)
+          }
+        )
+        
       }))
+      
+      #### Matrix Processing -------------------------------------------------------
+      # developing reactive variable for the input expression matrix to be used downstream
+      
+      output$rendMatrixHeader <- renderUI({
+        req(expr_raw())
+        h3("Expr Matrix Preview")
+      })
+      output$expr_matrix_react_output_input <- DT::renderDataTable({
+        req(expr_raw())
+        DT::datatable(expr_raw(),
+                      options = list(lengthMenu = c(5,10, 20, 100, 1000),
+                                     pageLength = 10,
+                                     scrollX = T),
+                      rownames = F)
+      })
+      
+      output$rendMetaHeader <- renderUI({
+        req(meta_raw())
+        h3("Meta Preview")
+      })
+      output$meta_file <- DT::renderDataTable({
+        DT::datatable(meta_raw(),
+                      options = list(lengthMenu = c(5,10, 20, 100, 1000),
+                                     pageLength = 10,
+                                     scrollX = T),
+                      rownames = F)
+        
+      })
+      
+      output$rendtext3 <- renderUI({
+        p(paste0("Expression Matrix Path: ", expr_file_react()))
+      })
+      
+      output$rendtext4 <- renderUI({
+        p(paste0("Expression Matrix Path: ", meta_file_react()))
+      })
+      
+      # Download handler for the button
+      output$download_expr <- downloadHandler(
+        filename = function() {
+          paste("expr_matrix_", expr_file_react(), "_", Sys.Date(), ".tsv", sep = "")
+        },
+        content = function(file) {
+          gene_name = rownames(expr_raw())
+          write_tsv(cbind(gene_name, expr_raw()), file, col_names = T)
+        }
+      )
+      
+      output$download_meta <- downloadHandler(
+        filename = function() {
+          paste("meta_data_", meta_file_react(), "_", Sys.Date(), ".tsv", sep = "")
+        },
+        content = function(file) {
+          write_tsv(meta_raw(), file, col_names = T)
+        }
+      )
+      
       
       # Gene Set Data -------------------------------------------------------------
       gmt <- reactiveVal()
